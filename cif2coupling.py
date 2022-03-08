@@ -22,6 +22,7 @@ import os
 import glob
 import ase.io
 import ase.build
+from ccdc import io 
 import datetime 
 import time 
 
@@ -79,6 +80,15 @@ print("    Computations started at:")
 print (str(now))
 print("!-----------------------------------------------------!")
 
+
+
+mol_file = str(os.path.splitext(os.path.basename(cif_file))[0])+".mol"
+reader = io.CrystalReader(cif_file) # Leggo il cif
+for c in reader:
+    unit_cell_molecule = c.packing(((0, 0, 0), (0.9, 0.9, 0.9)))
+    with io.CrystalWriter(mol_file) as crystal_writer:
+            crystal_writer.write(unit_cell_molecule)
+# Read as xyz
 
 pass
 
