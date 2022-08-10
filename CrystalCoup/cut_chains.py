@@ -2,6 +2,7 @@
 
 import os
 import numpy as np
+import argparse as arg
 import MDAnalysis as mda
 
 
@@ -199,9 +200,41 @@ def cut_alkyl_chains(u, outtraj=None, alkyl=True, ether=False, d=1.09):
     return n
 
 
+def options():
+    '''Defines the options of the script.'''
+
+    parser = arg.ArgumentParser(
+                formatter_class=arg.ArgumentDefaultsHelpFormatter)
+
+    #
+    # Input Options
+    #
+    inp = parser.add_argument_group("Input Data")
+
+    inp.add_argument('-i', '--inputfile',
+            type=str,
+            dest='InpFile',
+            default=None,
+            help='''Input file for chain cropping.'''
+        )
+
+
+    args = parser.parse_args()
+    Opts = vars(args)
+
+    return Opts
+
+
 def main():
 
-    gros = [ i for i in os.listdir(os.getcwd()) if i.endswith(".gro") ]
+    # Get command line options
+    Opts = options()
+
+    if Opts['InpFile'] is not None:
+        gros = [ Opts['InpFile'] ]
+    else:
+        gros = [ i for i in os.listdir(os.getcwd()) if i.endswith(".gro") ]
+
     for gro in gros:
         basename = '.'.join(gro.split(".")[:-1])
         trj = mda.Universe(gro, guess_bonds=True)
