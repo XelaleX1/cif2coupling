@@ -1,0 +1,14 @@
+%nproc={{ nproc }}
+%mem={{ mem }}GB
+%chk={{ dimername }}.chk
+#p td=nstates=3 {{ funct }}/{{ basis }} empiricaldispersion={{ disp }} eet(fragment=2) scrf(pcm,solvent=benzene,read) nosymm
+
+{{ dimername }}
+
+0 1 0 1 0 1
+{% for atom in mol1 %}{{ "%-15s"|format(atom[0]+"(fragment=1)") }} {{ "%12.6f"|format(atom[1])}} {{ "%12.6f"|format(atom[2])}} {{ "%12.6f"|format(atom[3]) }}
+{% endfor %}{% for atom in mol2 %}{{ "%-15s"|format(atom[0]+"(fragment=2)") }} {{ "%12.6f"|format(atom[1])}} {{ "%12.6f"|format(atom[2])}} {{ "%12.6f"|format(atom[3]) }}
+{% endfor %}
+eps=4.0
+
+

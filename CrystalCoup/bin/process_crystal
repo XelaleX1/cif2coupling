@@ -1,0 +1,247 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import numpy as np
+import pandas as pd
+import argparse as arg
+import MDAnalysis as mda
+from jinja2 import Environment, FileSystemLoader
+
+from CrystalCoup import neighs
+from CrystalCoup import cut_chains
+from CrystalCoup.mk_g16_inp import mk_ti_inp, mk_eet_inp, mk_teet_inp
+
+import warnings
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+
+
+def options():
+    '''Defines the options of the script.'''
+
+    parser = arg.ArgumentParser(
+                formatter_class=arg.ArgumentDefaultsHelpFormatter)
+
+    #
+    # Input Options
+    #
+    inp = parser.add_argument_group("Input Data")
+
+    inp.add_argument('-u', '--unitcell',
+            type=str,
+            dest='UnitFile',
+            required=True,
+            help='''Unit Cell structure file.'''
+        )
+
+    inp.add_argument('-s', '--supercell',
+            type=str, 
+            dest='SuperFile',
+            required=True,
+            help='''Super Cell structure file.'''
+        )
+
+    inp.add_argument('-ub', '--unitbox',
+            type=float,
+            nargs=6,
+            dest='UnitBox',
+            required=True,
+            help='''Unit Cell parameters.'''
+        )
+
+    inp.add_argument('-sb', '--superbox',
+            type=int,
+            nargs=3,
+            default=[ 3, 3, 3 ],
+            dest='SuperBox',
+            help='''Miller indices size of the Super Cell.'''
+        )
+
+    #
+    # Calculation Options
+    #
+    calc = parser.add_argument_group("Calculation Data")
+
+    calc.add_argument('-c', '--cutoff',
+            type=float,
+            default=5.0,
+            dest='Cutoff',
+            help='''Cutoff for proximity search of dimers.'''
+        )
+
+    calc.add_argument('-r', '--maxr',
+            type=float,
+            default=15.0,
+            dest='Threshold',
+            help='''Maximum distance between centres of mass for dimers.'''
+        )
+
+    calc.add_argument('-cr', '--nocrop',
+            default=True,
+            action='store_false',
+            dest='Crop',
+            help='''Crop side chains for electronic calculations.'''
+        )
+
+    calc.add_argument('-n', '--nproc',
+            type=int,
+            default=8,
+            dest='NProc',
+            help='''Number of processors for G16 calculations.'''
+        )
+
+    calc.add_argument('-m', '--mem',
+            type=int,
+            default=24,
+            dest='Mem',
+            help='''Memory (in GB) for G16 calculations.'''
+        )
+
+    calc.add_argument('-f', '--funct',
+            type=str,
+            default='B3LYP',
+            dest='DFT',
+            help='''Density Functional for G16 calculations.'''
+        )
+
+    calc.add_argument('-b', '--basis',
+            type=str,
+            default='6-31G(d)',
+            dest='Basis',
+            help='''Basis set for G16 calculations.'''
+        )
+
+    calc.add_argument('-d', '--disp',
+            type=str,
+            default='GD3',
+            dest='Disp',
+            help='''Empirical Dispersion for G16 calculations.'''
+        )
+
+    calc.add_argument('-j', '--coup',
+            type=str,
+            default='TI',
+            nargs='+',
+            choices=[ 'TI', 'EET', 'TEET' ],
+            dest='Coup',
+            help='''Type of electronic coupling to compute.'''
+        )
+
+    #
+    # Output Options
+    #
+    out = parser.add_argument_group("Output Options")
+
+    out.add_argument('-o', '--out',
+            default='couplings',
+            type=str,
+            dest='Out',
+            help='''Output folder.'''
+        )
+
+    args = parser.parse_args()
+    Opts = vars(args)
+
+    Opts['UnitBox'] = np.asarray(Opts['UnitBox'])
+    Opts['SuperBox'] = np.asarray(Opts['SuperBox'])
+
+    return Opts
+
+
+def main(**Opts):
+
+    pwd = os.getcwd()
+
+    # Find neighbours and write them
+    coupdir, csvfile = neighs.process_dimers(**Opts)
+
+    # Crop side chains
+    if Opts['Crop']:
+        cropdir = os.path.join(coupdir, 'nochains')
+        try:
+            os.makedirs(cropdir)
+        except:
+            pass
+
+        gros = [ i for i in os.listdir(coupdir) if i.endswith(".gro") ]
+        for gro in gros:
+
+            # Crop
+            fgro = os.path.join(coupdir, gro)
+            trj = mda.Universe(fgro, guess_bonds=True)
+            u = cut_chains.cut_alkyl_chains(trj)
+
+            # Save
+            basename = '.'.join(gro.split(".")[:-1])
+            cropfile = os.path.join(cropdir, f'{basename}.xyz')
+            u.atoms.write(cropfile)
+
+        os.chdir(coupdir)
+
+    # Create G16 input files
+    comdir = os.path.join(coupdir, 'G16')
+    try:
+        os.makedirs(comdir)
+    except:
+        pass
+
+    # Which geometries to use to generate inputs
+    if Opts['Crop']:
+        geodir = cropdir
+    else:
+        geodir = coupdir
+
+    # Loop over xyz files
+    xyzs = [ i for i in os.listdir(geodir) if i.endswith(".xyz") ]
+    for xyz in xyzs:
+        fxyz = os.path.join(geodir, xyz)
+
+        # Process names
+        basename = '.'.join(xyz.split(".")[:-1])
+        m1name = "monomer_"  + basename.split("_")[1]
+        m2name = "monomer_"  + basename.split("_")[2]
+
+        # Process geometry
+        d = mda.Universe(fxyz)
+        dim = np.c_[ d.atoms.types, d.atoms.positions ]
+        n = int(dim.shape[0] / 2)
+        m1 = dim[:n]
+        m2 = dim[n:]
+
+        # Generate G16 inputs
+        # Excitonic coupling S-S
+        if "EET" in Opts['Coup']:
+            coms = mk_eet_inp(m1, m2,
+                            basename=basename,
+                            outdir=comdir,
+                            **Opts
+                        )
+
+        # Excitonic coupling T-T
+        if "TEET" in Opts['Coup']:
+            coms = mk_teet_inp(m1, m2,
+                            basename=basename,
+                            monomer1name=m1name,
+                            monomer2name=m2name,
+                            outdir=comdir,
+                            **Opts
+                        )
+
+        # Transfer Integrals
+        if "TI" in Opts['Coup']:
+            coms = mk_ti_inp(m1, m2,
+                            basename=basename,
+                            monomer1name=m1name,
+                            monomer2name=m2name,
+                            outdir=comdir,
+                            **Opts
+                        )
+
+    return
+
+
+if __name__ == '__main__':
+    # Get command line options
+    Opts = options()
+    main(**Opts)

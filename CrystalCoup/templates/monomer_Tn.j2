@@ -1,0 +1,13 @@
+%nproc={{ nproc }}
+%mem={{ mem }}GB
+%chk={{ monomername }}_T{{ state }}.chk
+#p tda(nstates=3,AllTransitionDensities) {{ funct }}/{{ basis }} empiricaldispersion={{ disp }} scrf(pcm,solvent=benzene,read) nosymm density=transition={{ state }} pop=AllOrbitals
+
+{{ monomername }} T{{ state }}
+
+0 1
+{% for atom in mol %}{{ "%-3s"|format(atom[0]) }} {{ "%12.6f"|format(atom[1])}} {{ "%12.6f"|format(atom[2])}} {{ "%12.6f"|format(atom[3]) }}
+{% endfor %}
+eps=4.0
+
+
