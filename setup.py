@@ -16,7 +16,7 @@ setup(
         "License :: OSI Approved :: GNU GPL License",
         "Operating System :: OS Independent",
     ],
-	scripts=[
+    scripts=[
             'CrystalCoup/bin/process_crystal',
         ],
     entry_points={ 
