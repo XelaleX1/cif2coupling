@@ -22,6 +22,7 @@ setup(
     entry_points={ 
         'console_scripts' : [
             'find_dimers=CrystalCoup.neighs:main',
+            'cut_chains=CrystalCoup.cut_chains:main',
             'make_coup_inp=CrystalCoup.mk_g16_inp:main',
             ]
         },

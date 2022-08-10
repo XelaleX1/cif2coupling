@@ -199,7 +199,7 @@ def cut_alkyl_chains(u, outtraj=None, alkyl=True, ether=False, d=1.09):
     return n
 
 
-if __name__ == '__main__':
+def main():
 
     gros = [ i for i in os.listdir(os.getcwd()) if i.endswith(".gro") ]
     for gro in gros:
@@ -207,3 +207,8 @@ if __name__ == '__main__':
         trj = mda.Universe(gro, guess_bonds=True)
         u = cut_alkyl_chains(trj)
         u.atoms.write(f'{basename}.xyz')
+
+    return
+
+if __name__ == '__main__':
+    main()
