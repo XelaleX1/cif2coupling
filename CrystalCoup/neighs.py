@@ -5,7 +5,6 @@ import csv
 import sys
 import numpy as np
 import pandas as pd
-import networkx as nx
 import argparse as arg
 import MDAnalysis as mda
 from MDAnalysis.lib import distances
@@ -176,54 +175,75 @@ def close_neighbours(dimers, cutoff=15.0):
     return close_dimers
 
 
-def unique_neighbours(dimers, tol=1e-3):
+def unique_neighbours(dimers, tol=0.05):
     '''
     '''
 
-    rdiff = np.zeros((len(list(dimers.keys())), len(list(dimers.keys()))))
+    equiv = np.zeros((len(list(dimers.keys())), len(list(dimers.keys()))))
     for i, k1 in enumerate(list(dimers.keys())):
 
         # Get closest dimers according to Minimum Image Convention
         v1 = dimers[k1]
         d1 = check_relative_position(v1[0], v1[1])
 
-        # Distance in dimer 1
-        com11 = d1[0].center_of_mass()
-        com12 = d1[1].center_of_mass()
-        r1 = np.linalg.norm(com11 - com12)
-
-        for j, k2 in enumerate(list(dimers.keys())):#[i + 1:]):
+        for j, k2 in enumerate(list(dimers.keys())):
 
             # Get closest dimers according to Minimum Image Convention
             v2 = dimers[k2]
             d2 = check_relative_position(v2[0], v2[1])
 
-            # Distance in dimer 2
-            com21 = d2[0].center_of_mass()
-            com22 = d2[1].center_of_mass()
-            r2 = np.linalg.norm(com21 - com22)
-
-            # Compare distances
-            rdiff[i,j] = np.abs(r1 - r2)
+            # Compare dimers
+            equiv[i,j] = is_equivalent(d1, d2, tol=tol)
 
     # Select by non-equivalence
-    G = nx.Graph()
-    G.add_nodes_from(list(dimers.keys()))
+    uidxs = []
+    for r in equiv:
+        idx = np.where(r == 1)[0][0]
+        uidxs.append(idx)
 
-    i, j = np.where(rdiff > tol)
-    dim_i = [ list(dimers.keys())[x] for x in i ]
-    dim_j = [ list(dimers.keys())[y] for y in j ]
-    G.add_weighted_edges_from(zip(dim_i, dim_j, rdiff[i,j]), weight="r")
-    subgraphs = [ G.subgraph(g) for g in nx.connected_components(G) ]
-    ukeys = []
-    for g in subgraphs:
-        for edge in g.edges:
-            ukeys.extend(edge)
-
+    ukeys = [ list(dimers.keys())[i] for i in uidxs ]
     ukeys = sorted(list(set(ukeys)), key=lambda x: (x[0], x[1]))
     neighs = { k: dimers[k] for k in ukeys }
 
     return neighs
+
+
+def is_equivalent(d1, d2, tol=0.05):
+    '''
+    '''
+
+    # 1 - monomer COMs distances criterion
+    com11 = d1[0].center_of_mass()
+    com12 = d1[1].center_of_mass()
+    rij = com11 - com12
+    rijnorm = np.linalg.norm(rij)
+    rij /= rijnorm
+
+    com21 = d2[0].center_of_mass()
+    com22 = d2[1].center_of_mass()
+    rkl = com21 - com22
+    rklnorm = np.linalg.norm(rkl)
+    rkl /= rklnorm
+
+    Sd = np.abs(np.dot(rij, rkl))
+
+    # 2 - Inertia axes criterion
+    dim1 = sum(d1)
+    Iij = dim1.principal_axes()[::-1].T
+    if np.linalg.det(Iij) < 0.0:
+        Iij[:,-1] = -Iij[:,-1]
+
+    dim2 = sum(d2)
+    Ikl = dim2.principal_axes()[::-1].T
+    if np.linalg.det(Ikl) < 0.0:
+        Ikl[:,-1] = -Ikl[:,-1]
+
+    SIn = np.abs(np.diag(np.dot(Iij.T, Ikl))).mean()
+
+    S = np.mean([ Sd, SIn ])
+    check = np.isclose(S, 1.0, atol=tol)
+
+    return check
 
 
 def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
