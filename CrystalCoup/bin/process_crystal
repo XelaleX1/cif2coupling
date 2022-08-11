@@ -58,6 +58,14 @@ def options():
             help='''Miller indices size of the Super Cell.'''
         )
 
+    inp.add_argument('-fg', '--frag',
+            default=None,
+            type=int,
+            dest='FragAts',
+            help='''Number of atoms per fragment, if fragmenting outside of
+            MDAnalysis.'''
+        )
+
     #
     # Calculation Options
     #

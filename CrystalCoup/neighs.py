@@ -17,13 +17,39 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 
-def map_unit_to_super(unitcell, supercell):
+def fragment(universe, nats):
+    '''
+    Function to define fragments independently of MDAnalysis
+
+    Parameters
+    ----------
+    universe: object.
+        MDAnalysis universe.
+    nats : int.
+        Number of atoms in each fragment.
+
+    Returns
+    -------
+    fragments : tuple.
+        Molecules to consider as list of MDAnalysis atom selections.
+    '''
+
+    tot = universe.atoms.n_atoms
+    fragments = []
+    for i, j in zip(np.arange(0, tot, nats), np.arange(0, tot, nats)[1:] - 1):
+        ag = universe.select_atoms("index %d:%d" % (i, j))
+        fragments.append(ag)
+
+    return tuple(fragments)
+
+
+def map_unit_to_super(ufrags, sfrags):
     '''
     '''
 
     u_in_s = {}
-    for i, ifrag in enumerate(unitcell.atoms.fragments):
-        for j, jfrag in enumerate(supercell.atoms.fragments):
+    for i, ifrag in enumerate(ufrags):
+        for j, jfrag in enumerate(sfrags):
             if np.allclose(ifrag.atoms.positions,
                            jfrag.atoms.positions):
                 u_in_s[i] = j
@@ -309,7 +335,7 @@ def is_equivalent(d1, d2, tol=0.05):
     return check
 
 
-def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
+def miller_idxs(unitcell, ufrags, monomer, box=None, tol=1e-3):
     '''
     Function get Miller indices describing the position of a monomer in a
     supercell with respect to the unit cell.
@@ -318,6 +344,8 @@ def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
     ----------
     unitcell: object.
         MDAnalysis atom selection.
+    ufrags : list.
+        Molecules to consider as list of MDAnalysis atom selections.
     monomer: object.
         MDAnalysis atom selection.
     box: list or np.array (6).
@@ -364,7 +392,7 @@ def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
 
     # figure out monomer correspondence in the unitcell
     idx = None
-    for i, ifrag in enumerate(unitcell.atoms.fragments):
+    for i, ifrag in enumerate(ufrags):
         if np.allclose(ifrag.atoms.positions,
                        newx):
             idx = i
@@ -372,7 +400,7 @@ def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
     return idx, shift
 
 
-def save_dimers(unitcell, supercell, dimers, outdir):
+def save_dimers(unitcell, supercell, ufrags, dimers, outdir):
 
     # Save geometries for coupling calculations and summary
     try:
@@ -388,8 +416,8 @@ def save_dimers(unitcell, supercell, dimers, outdir):
 
         # Compure Miller indices and shift geometries according to
         # Minimum Image Convention
-        idx1, shift1 = miller_idxs(unitcell, v[0])
-        idx2, shift2 = miller_idxs(unitcell, v[1])
+        idx1, shift1 = miller_idxs(unitcell, ufrags, v[0])
+        idx2, shift2 = miller_idxs(unitcell, ufrags, v[1])
         m1, m2 = check_relative_position(v[0], v[1], supercell.dimensions)
         d = m1 + m2
         data.append([ k[0], k[1], idx1, idx2 ] + shift1.tolist() + shift2.tolist() )
@@ -427,22 +455,34 @@ def save_dimers(unitcell, supercell, dimers, outdir):
 def process_dimers(**Opts):
 
     # Read Unit Cell
-    u = mda.Universe(Opts['UnitFile'], guess_bonds=True)
+    if Opts['FragAts'] is None:
+        u = mda.Universe(Opts['UnitFile'], guess_bonds=True)
+        ufrags = u.atoms.fragments
+    else:
+        u = mda.Universe(Opts['UnitFile'])
+        ufrags = fragment(u, Opts['FragAts'])
+
     if Opts['UnitBox'] is not None:
         u.dimensions = Opts['UnitBox']
         u.atoms.dimensions = Opts['UnitBox']
 
     # Read Supercell
-    s = mda.Universe(Opts['SuperFile'], guess_bonds=True)
+    if Opts['FragAts'] is None:
+        s = mda.Universe(Opts['SuperFile'], guess_bonds=True)
+        sfrags = s.atoms.fragments
+    else:
+        s = mda.Universe(Opts['SuperFile'])
+        sfrags = fragment(s, Opts['FragAts'])
+
     if Opts['SuperBox'] is not None:
         s.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3: ] ]
         s.atoms.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3: ] ]
 
     # Get map between mols in unit and super cells
-    map_unit_super = map_unit_to_super(u, s)
+    map_unit_super = map_unit_to_super(ufrags, sfrags)
 
     # Find all dimers in the supercell
-    dimers = find_dimers(s.atoms.fragments, cutoff=Opts['Cutoff'])
+    dimers = find_dimers(sfrags, cutoff=Opts['Cutoff'])
 
     # Pick first molecule in the unit cell and get its index in the supercell
     refidx = 0
@@ -466,7 +506,7 @@ def process_dimers(**Opts):
     uneighs = unique_neighbours(close)
 
     # Save geometries
-    coupdir, csvfile = save_dimers(u, s, uneighs, Opts['Out'])
+    coupdir, csvfile = save_dimers(u, s, ufrags, uneighs, Opts['Out'])
 
     return coupdir, csvfile
 
@@ -508,6 +548,14 @@ def options():
             nargs=3,
             dest='SuperBox',
             help='''Miller indices size of the Super Cell.'''
+        )
+
+    inp.add_argument('-f', '--frag',
+            default=None,
+            type=int,
+            dest='FragAts',
+            help='''Number of atoms per fragment, if fragmenting outside of
+            MDAnalysis.'''
         )
 
     inp.add_argument('-c', '--cutoff',
