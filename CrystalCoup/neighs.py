@@ -33,19 +33,19 @@ def map_unit_to_super(unitcell, supercell):
 
 def _find_contacts(fragments, cutoff=5.0):
     '''
-    Raw version to return indices of touching fragments
+    Function to obtain indices of touching fragments.
 
     Parameters
     ----------
-    fragments : list of AtomGroup
-        molecules to consider
-    cutoff : float
-        threshold for touching or not
+    fragments : list.
+        Molecules to consider as list of MDAnalysis atom selections.
+    cutoff : float (default: 5.0).
+        Threshold for touching or not (in Angstroem).
 
     Returns
     -------
-    frag_idx : numpy array, shape (n, 2)
-        indices of fragments that are touching, e.g. [[0, 1], [2, 3], ...]
+    frag_idx : np.array (N,2).
+        Indices of fragments that are touching, e.g. [[0, 1], [2, 3], ...]
     '''
 
     # indices of atoms within cutoff of each other
@@ -74,21 +74,19 @@ def _find_contacts(fragments, cutoff=5.0):
 
 def find_dimers(fragments, cutoff=5.0):
     '''
-    Calculate dimers to run
+    Function to obtain dimers to calculate.
 
     Parameters
     ----------
-    fragments : list of AtomGroups
-        list of all fragments in system.  Must all be centered in box and
-        unwrapped
-    cutoff : float
-        maximum distance allowed between fragments to be considered
-        a dimer
+    fragments : list.
+        Molecules to consider as list of MDAnalysis atom selections.
+    cutoff : float (default: 5.0).
+        Threshold for touching or not (in Angstroem).
 
     Returns
     -------
-    dimers : dictionary
-        mapping of {(x, y): (ag_x, ag_y)} for all dimer pairs
+    dimers : dict.
+        Mapping of {(x, y): (ag_x, ag_y)} for all dimers.
     '''
 
     fragidx = _find_contacts(fragments, cutoff)
@@ -110,6 +108,9 @@ def check_relative_position(monomer1, monomer2, box=None, tol=1e-3):
         MDAnalysis atom selection.
     monomer2: object.
         MDAnalysis atom selection.
+    box: list or np.array (6).
+        Box describing PBCs as a list of a, b, c, alpha, beta, gamma
+        (lenghts in Angstroem, angles in degrees).
     tol: float.
         Tolerance for distance comparison (in Angstroem).
 
@@ -152,6 +153,19 @@ def check_relative_position(monomer1, monomer2, box=None, tol=1e-3):
 
 def close_neighbours(dimers, cutoff=15.0):
     '''
+    Function to retain only dimers where monomers are within a threshold.
+
+    Parameters
+    ----------
+    dimers : dict.
+        Mapping of {(x, y): (ag_x, ag_y)} for all dimers.
+    cutoff : float (default: 5.0).
+        Threshold for touching or not (in Angstroem).
+
+    Returns
+    -------
+    close_dimers : dict.
+        Mapping of {(x, y): (ag_x, ag_y)} for all dimers.
     '''
 
     idxs = []
@@ -175,8 +189,21 @@ def close_neighbours(dimers, cutoff=15.0):
     return close_dimers
 
 
-def unique_neighbours(dimers, tol=0.05):
+def unique_neighbours(dimers, tol=0.10):
     '''
+    Function to discard symmetry equivalent dimers.
+
+    Parameters
+    ----------
+    dimers : dict.
+        Mapping of {(x, y): (ag_x, ag_y)} for all dimers.
+    tol : float (default: 0.1).
+        Threshold for equivalence comparison.
+
+    Returns
+    -------
+    neighs : dict.
+        Mapping of {(x, y): (ag_x, ag_y)} for all non-equivalent dimers.
     '''
 
     equiv = np.zeros((len(list(dimers.keys())), len(list(dimers.keys()))))
@@ -210,6 +237,37 @@ def unique_neighbours(dimers, tol=0.05):
 
 def is_equivalent(d1, d2, tol=0.05):
     '''
+    Function evaluate equivalence between two dimers. The equivalence is
+    evaluated through two contributions, Sd and SIn
+    The first contribution evaluates the distance between centers of mass
+    of the monomers within the two dimers.
+    This contribution is given by the absolute dot product between the two
+    distance vectors (maximum when aligned), weighted by a negative exponential
+    of the absolute difference between the norms of such two vectors (maximum
+    when they are the same).
+    The second contribution is given by a similarity index between principal
+    axes of inertia, and it is given by the average of the absolute dot product
+    between the three principal axes.
+    The two contributions are then averaged and, if close to 1 within the
+    provided tolerance, the dimers are considered equivalent.
+
+    Additional geometric criteria comparing principal axes of inertia of
+    monomers within dimers can be easily added for a stricter evaluation
+    of equivalence.
+
+    Parameters
+    ----------
+    d1 : list.
+        List of MDAnalysis atom selections describing a dimer.
+    d2 : list.
+        List of MDAnalysis atom selections describing a dimer.
+    tol : float (default: 0.05).
+        Threshold for equivalence comparison.
+
+    Returns
+    -------
+    check : bool.
+        Whether dimers d1 and d2 are equivalent or not, within tol.
     '''
 
     # 1 - monomer COMs distances criterion
@@ -225,7 +283,11 @@ def is_equivalent(d1, d2, tol=0.05):
     rklnorm = np.linalg.norm(rkl)
     rkl /= rklnorm
 
-    Sd = np.abs(np.dot(rij, rkl))
+    # Check orientation of monomer distances
+    # To do: we are not checking rijnorm and rklnorm
+    d = np.abs(np.dot(rij, rkl))
+    w = np.exp(-np.abs(rijnorm - rklnorm))
+    Sd = w * d
 
     # 2 - Inertia axes criterion
     dim1 = sum(d1)
@@ -240,6 +302,7 @@ def is_equivalent(d1, d2, tol=0.05):
 
     SIn = np.abs(np.diag(np.dot(Iij.T, Ikl))).mean()
 
+    # Total similarity
     S = np.mean([ Sd, SIn ])
     check = np.isclose(S, 1.0, atol=tol)
 
@@ -248,6 +311,28 @@ def is_equivalent(d1, d2, tol=0.05):
 
 def miller_idxs(unitcell, monomer, box=None, tol=1e-3):
     '''
+    Function get Miller indices describing the position of a monomer in a
+    supercell with respect to the unit cell.
+
+    Parameters
+    ----------
+    unitcell: object.
+        MDAnalysis atom selection.
+    monomer: object.
+        MDAnalysis atom selection.
+    box: list or np.array (6).
+        Box describing PBCs as a list of a, b, c, alpha, beta, gamma
+        (lenghts in Angstroem, angles in degrees).
+    tol: float.
+        Tolerance for distance comparison (in Angstroem).
+
+    Returns
+    -------
+    idx: int.
+        Index of the molecule in the unit cell corresponding to monomer.
+    shift: np.array (3).
+        Miller indices describing the position of monomer in the supercell
+        with respect to the unit cell.
     '''
 
     com1 = unitcell.atoms.center_of_mass()
