@@ -85,6 +85,13 @@ def options():
             help='''Maximum distance between centres of mass for dimers.'''
         )
 
+    calc.add_argument('-e', '--eq',
+            type=float,
+            default=0.05,
+            dest='EqTol',
+            help='''Tolerance for equivalence evaluation.'''
+        )
+
     calc.add_argument('-cr', '--nocrop',
             default=True,
             action='store_false',

@@ -215,7 +215,7 @@ def close_neighbours(dimers, cutoff=15.0):
     return close_dimers
 
 
-def unique_neighbours(dimers, tol=0.10):
+def unique_neighbours(dimers, tol=0.05):
     '''
     Function to discard symmetry equivalent dimers.
 
@@ -503,7 +503,7 @@ def process_dimers(**Opts):
     close = close_neighbours(reordered, cutoff=Opts['Threshold'])
 
     # Get rid of equivalent dimers
-    uneighs = unique_neighbours(close)
+    uneighs = unique_neighbours(close, tol=Opts['EqTol'])
 
     # Save geometries
     coupdir, csvfile = save_dimers(u, s, ufrags, uneighs, Opts['Out'])
@@ -570,6 +570,13 @@ def options():
             default=15.0,
             dest='Threshold',
             help='''Maximum distance between centres of mass for dimers.'''
+        )
+
+    inp.add_argument('-e', '--eq',
+            type=float,
+            default=0.05,
+            dest='EqTol',
+            help='''Tolerance for equivalence evaluation.'''
         )
 
     #
