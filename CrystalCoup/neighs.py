@@ -161,7 +161,7 @@ def check_relative_position(monomer1, monomer2, box=None, tol=1e-3):
     d_nopbc = distance_array(com1, com2)
 
     # Check whether the two are not the same
-    check = np.allclose(d, d_nopbc, atol=tol)
+    check = np.isclose(d, d_nopbc, atol=tol)
 
     # if not, shift monomer2
     if not check:
@@ -201,7 +201,7 @@ def close_neighbours(dimers, cutoff=15.0):
         v = dimers[k]
         d = check_relative_position(v[0], v[1])
 
-        # Distance in dimer 1
+        # Distance between monomers COMs
         com1 = d[0].center_of_mass()
         com2 = d[1].center_of_mass()
         r = np.linalg.norm(com1 - com2)
@@ -475,8 +475,8 @@ def process_dimers(**Opts):
         sfrags = fragment(s, Opts['FragAts'])
 
     if Opts['SuperBox'] is not None:
-        s.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3: ] ]
-        s.atoms.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3: ] ]
+        s.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3:] ]
+        s.atoms.dimensions = np.r_[ Opts['UnitBox'][:3] * Opts['SuperBox'], Opts['UnitBox'][3:] ]
 
     # Get map between mols in unit and super cells
     map_unit_super = map_unit_to_super(ufrags, sfrags)
@@ -546,6 +546,7 @@ def options():
     inp.add_argument('-sb', '--superbox',
             type=int,
             nargs=3,
+            default=[ 3, 3, 3 ],
             dest='SuperBox',
             help='''Miller indices size of the Super Cell.'''
         )
