@@ -575,7 +575,7 @@ def options():
 
     inp.add_argument('-e', '--eq',
             type=float,
-            default=0.05,
+            default=0.10,
             dest='EqTol',
             help='''Tolerance for equivalence evaluation.'''
         )

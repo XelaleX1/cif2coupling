@@ -1,1 +1,1 @@
-process_crystal -u unit.xyz -s super.xyz -ub 39.981 7.7106 6.1265 90.0 94.028 90.0 -sb 3 3 3 --coup TI -e 0.1
+process_crystal -u unit.xyz -s super.xyz -ub 12.509 3.945 17.719 90.0 100.019 90.0 -sb 3 3 3 --coup TI --nocrop
