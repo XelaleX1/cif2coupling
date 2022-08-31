@@ -117,6 +117,14 @@ def pack_crystal(**Opts):
     return unitxyzfile, box, superxyzfile
 
 
-if __name__ == '__main__':
+def main():
+
+    # Get command line options
     Opts = options()
     pack_crystal(**Opts)
+
+    return
+
+
+if __name__ == '__main__':
+    pass

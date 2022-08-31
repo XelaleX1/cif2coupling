@@ -23,6 +23,7 @@ setup(
         'console_scripts' : [
             'find_dimers=CrystalCoup.neighs:main',
             'cut_chains=CrystalCoup.cut_chains:main',
+            'pack_crystal=CrystalCoup.pack_crystal:main',
             'make_coup_inp=CrystalCoup.mk_g16_inp:main',
             ]
         },
