@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from CrystalCoup import neighs
 from CrystalCoup import cut_chains
+from CrystalCoup import pack_crystal
 from CrystalCoup.mk_g16_inp import mk_ti_inp, mk_eet_inp, mk_teet_inp
 
 import warnings
@@ -26,31 +27,49 @@ def options():
     #
     # Input Options
     #
-    inp = parser.add_argument_group("Input Data")
+    inp = parser.add_mutually_exclusive_group(required=True)
 
-    inp.add_argument('-u', '--unitcell',
+    inp.add_argument('-cif', '--cif',
             type=str,
-            dest='UnitFile',
-            required=True,
-            help='''Unit Cell structure file.'''
+            default=None,
+            dest='CIFFile',
+            help='''Crystal structure file.'''
         )
 
-    inp.add_argument('-s', '--supercell',
+    inp.add_argument('-id', '--identifier',
             type=str, 
-            dest='SuperFile',
-            required=True,
-            help='''Super Cell structure file.'''
+            dest='CSD_ID',
+            help='''Cambridge Structural Database identifier.'''
         )
 
-    inp.add_argument('-ub', '--unitbox',
-            type=float,
-            nargs=6,
-            dest='UnitBox',
-            required=True,
-            help='''Unit Cell parameters.'''
-        )
+    #
+    # Input Options
+    #
+    box = parser.add_argument_group("Input Data")
 
-    inp.add_argument('-sb', '--superbox',
+    # inp.add_argument('-u', '--unitcell',
+    #         type=str,
+    #         dest='UnitFile',
+    #         required=True,
+    #         help='''Unit Cell structure file.'''
+    #     )
+
+    # inp.add_argument('-s', '--supercell',
+    #         type=str, 
+    #         dest='SuperFile',
+    #         required=True,
+    #         help='''Super Cell structure file.'''
+    #     )
+
+    # inp.add_argument('-ub', '--unitbox',
+    #         type=float,
+    #         nargs=6,
+    #         dest='UnitBox',
+    #         required=True,
+    #         help='''Unit Cell parameters.'''
+    #     )
+
+    box.add_argument('-sb', '--superbox',
             type=int,
             nargs=3,
             default=[ 3, 3, 3 ],
@@ -58,7 +77,7 @@ def options():
             help='''Miller indices size of the Super Cell.'''
         )
 
-    inp.add_argument('-fg', '--frag',
+    box.add_argument('-fg', '--frag',
             default=None,
             type=int,
             dest='FragAts',
@@ -148,6 +167,13 @@ def options():
     #
     out = parser.add_argument_group("Output Options")
 
+    out.add_argument('-p', '--pref',
+            default=None,
+            type=str,
+            dest='Prefix',
+            help='''Crystals output file prefix.'''
+        )
+
     out.add_argument('-o', '--out',
             default='couplings',
             type=str,
@@ -158,7 +184,7 @@ def options():
     args = parser.parse_args()
     Opts = vars(args)
 
-    Opts['UnitBox'] = np.asarray(Opts['UnitBox'])
+    # Opts['UnitBox'] = np.asarray(Opts['UnitBox'])
     Opts['SuperBox'] = np.asarray(Opts['SuperBox'])
 
     return Opts
@@ -167,6 +193,12 @@ def options():
 def main(**Opts):
 
     pwd = os.getcwd()
+
+    # Pack crystal
+    unitxyzfile, unitbox, superxyzfile = pack_crystal.pack_crystal(**Opts)
+    Opts['UnitBox'] = unitbox
+    Opts['UnitFile'] = unitxyzfile
+    Opts['SuperFile'] = superxyzfile
 
     # Find neighbours and write them
     coupdir, csvfile = neighs.process_dimers(**Opts)
