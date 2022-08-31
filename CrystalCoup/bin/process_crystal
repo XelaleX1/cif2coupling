@@ -27,47 +27,51 @@ def options():
     #
     # Input Options
     #
-    inp = parser.add_mutually_exclusive_group(required=True)
+    sub = parser.add_subparsers(help='Input Structural Data')
+    csd_parser = sub.add_parser('csd', help='CSD Functionality parser.')
+    csd = csd_parser.add_mutually_exclusive_group(required=True)
 
-    inp.add_argument('-cif', '--cif',
+    csd.add_argument('-cif', '--cif',
             type=str,
             default=None,
             dest='CIFFile',
             help='''Crystal structure file.'''
         )
 
-    inp.add_argument('-id', '--identifier',
+    csd.add_argument('-id', '--identifier',
             type=str, 
             dest='CSD_ID',
             help='''Cambridge Structural Database identifier.'''
         )
 
+    inp = sub.add_parser('geom', help='Preprocessed structure parser.')
+    inp.add_argument('-u', '--unitcell',
+            type=str,
+            dest='UnitFile',
+            required=True,
+            help='''Unit Cell structure file.'''
+        )
+
+    inp.add_argument('-s', '--supercell',
+            type=str, 
+            dest='SuperFile',
+            required=True,
+            help='''Super Cell structure file.'''
+        )
+
+    inp.add_argument('-ub', '--unitbox',
+            type=float,
+            nargs=6,
+            dest='UnitBox',
+            required=True,
+            help='''Unit Cell parameters.'''
+        )
+
+
     #
-    # Input Options
+    # Common Input Options
     #
     box = parser.add_argument_group("Input Data")
-
-    # inp.add_argument('-u', '--unitcell',
-    #         type=str,
-    #         dest='UnitFile',
-    #         required=True,
-    #         help='''Unit Cell structure file.'''
-    #     )
-
-    # inp.add_argument('-s', '--supercell',
-    #         type=str, 
-    #         dest='SuperFile',
-    #         required=True,
-    #         help='''Super Cell structure file.'''
-    #     )
-
-    # inp.add_argument('-ub', '--unitbox',
-    #         type=float,
-    #         nargs=6,
-    #         dest='UnitBox',
-    #         required=True,
-    #         help='''Unit Cell parameters.'''
-    #     )
 
     box.add_argument('-sb', '--superbox',
             type=int,
@@ -195,10 +199,13 @@ def main(**Opts):
     pwd = os.getcwd()
 
     # Pack crystal
-    unitxyzfile, unitbox, superxyzfile = pack_crystal.pack_crystal(**Opts)
-    Opts['UnitBox'] = unitbox
-    Opts['UnitFile'] = unitxyzfile
-    Opts['SuperFile'] = superxyzfile
+    try:
+        unitxyzfile, unitbox, superxyzfile = pack_crystal.pack_crystal(**Opts)
+        Opts['UnitBox'] = unitbox
+        Opts['UnitFile'] = unitxyzfile
+        Opts['SuperFile'] = superxyzfile
+    except KeyError:
+        pass
 
     # Find neighbours and write them
     coupdir, csvfile = neighs.process_dimers(**Opts)
