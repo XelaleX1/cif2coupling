@@ -171,7 +171,7 @@ def check_relative_position(monomer1, monomer2, box=None, tol=1e-3):
 
         # apply the shift
         # newx = monomer2.positions - (np.rint(shift) * box[:3])
-        newx = monomer2.positions - np.dot(shift, boxv)
+        newx = monomer2.positions - np.dot(shift, boxv.T)
         monomer2.positions = newx
 
     return monomer1, monomer2
